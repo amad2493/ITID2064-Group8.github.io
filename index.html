@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hotel Booking System Management</title>
+    <title>Hotel Booking System Management (Local Demo)</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Use Inter font -->
@@ -17,37 +17,18 @@
         .status-Maintenance { background-color: #E0F2F1; color: #0E7490; border-left: 4px solid #2DD4BF; } /* Cyan */
         .tab-active { border-bottom: 3px solid #4F46E5; font-weight: 600; color: #4F46E5; }
         
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(255, 255, 255, 0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
+        /* Removed loading overlay as we don't need authentication */
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
 
-    <div id="loading" class="loading-overlay">
-        <div class="flex flex-col items-center">
-            <svg class="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p class="mt-4 text-gray-700">Initializing Database and Authentication...</p>
-        </div>
-    </div>
+    <!-- Removed loading screen -->
 
-    <div id="app" class="container mx-auto p-4 sm:p-6 lg:p-8 hidden">
+    <div id="app" class="container mx-auto p-4 sm:p-6 lg:p-8">
         <header class="mb-8 border-b pb-4">
-            <h1 class="text-3xl font-bold text-gray-800">Hotel Booking System - Admin Portal</h1>
-            <p class="text-sm text-gray-500 mt-1">Manage room inventory and guest reservations in real-time.</p>
-            <p id="user-info" class="text-xs mt-2 text-indigo-600 font-medium"></p>
+            <h1 class="text-3xl font-bold text-gray-800">Hotel Booking System - Admin Portal (LOCAL DEMO)</h1>
+            <p class="text-sm text-gray-500 mt-1">Manage room inventory and guest reservations using Local Storage.</p>
+            <p id="user-info" class="text-xs mt-2 text-red-600 font-medium">Database: Local Storage. Data is not shared.</p>
         </header>
         
         <!-- TABS FOR NAVIGATION -->
@@ -202,35 +183,23 @@
         </div>
     </div>
 
-    <!-- FIREBASE AND JAVASCRIPT LOGIC -->
-    <script type="module">
-        // Import Firebase modules
-        import { initializeApp, setLogLevel } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, doc, collection, onSnapshot, setDoc, deleteDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-        // Global Firebase variables provided by the Canvas environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+    <!-- JAVASCRIPT LOGIC (USING LOCAL STORAGE) -->
+    <script type="text/javascript">
         
-        let db;
-        let auth;
-        let userId = null;
-        let isAuthReady = false;
+        // --- DATA KEYS ---
+        const ROOMS_KEY = 'hotel_rooms';
+        const BOOKINGS_KEY = 'hotel_bookings';
+        
         let availableRooms = []; 
+        let currentRooms = []; // Master list of all rooms
 
-        // UI elements
+        // UI elements (defined globally for access)
         const roomsGrid = document.getElementById('rooms-grid');
         const roomsCount = document.getElementById('total-rooms');
         const bookingsList = document.getElementById('bookings-list');
         const bookingsCount = document.getElementById('active-bookings');
-        const userInfo = document.getElementById('user-info');
-        const loadingScreen = document.getElementById('loading');
-        const appContainer = document.getElementById('app');
         const noRoomsMessage = document.getElementById('no-rooms-message');
         const noBookingsMessage = document.getElementById('no-bookings-message');
-        
         const roomModal = document.getElementById('room-modal');
         const roomForm = document.getElementById('room-form');
         const bookingModal = document.getElementById('booking-modal');
@@ -245,58 +214,74 @@
 
         // --- Core Utility Functions ---
 
-        function getCollectionPath(name) {
-            // Using the public data path so all users can see/manage the same inventory/bookings
-            return `artifacts/${appId}/public/data/${name}`;
+        /**
+         * Loads data from localStorage or returns an empty array.
+         * @param {string} key - The localStorage key.
+         * @returns {Array} Parsed data array.
+         */
+        function loadData(key) {
+            try {
+                const data = localStorage.getItem(key);
+                return data ? JSON.parse(data) : [];
+            } catch (e) {
+                console.error(`Error loading data from ${key}`, e);
+                return [];
+            }
         }
 
         /**
-         * Initializes Firebase and authenticates the user.
+         * Saves data to localStorage.
+         * @param {string} key - The localStorage key.
+         * @param {Array} data - The array to save.
          */
-        async function initializeFirebase() {
+        function saveData(key, data) {
             try {
-                // *** CRITICAL DEPLOYMENT CHECK ***
-                // If firebaseConfig is empty (which happens if environment variables aren't injected, 
-                // e.g., on GitHub Pages), we must avoid calling initializeApp with an empty object,
-                // which often leads to the "Failed to load" error.
-                if (Object.keys(firebaseConfig).length === 0 && appId === 'default-app-id') {
-                    console.error("Firebase Configuration Missing. Cannot initialize database.");
-                    loadingScreen.innerHTML = '<p class="text-xl text-red-600 font-semibold">ERROR: Firebase Configuration Missing. This application only runs in an authenticated environment (like Canvas).</p><p class="mt-2 text-gray-700">The interactive features (CRUD/Real-time) will not work on static hosts like GitHub Pages.</p>';
-                    appContainer.classList.remove('hidden');
-                    return; 
-                }
-                
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                
-                setLogLevel('error');
-
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        userInfo.textContent = `Authenticated User ID: ${userId}`;
-                        isAuthReady = true;
-                        appContainer.classList.remove('hidden');
-                        loadingScreen.classList.add('hidden');
-                        startRoomListener();
-                        startBookingListener();
-                    } else {
-                        if (initialAuthToken) {
-                            await signInWithCustomToken(auth, initialAuthToken);
-                        } else {
-                            // Fallback to anonymous sign-in if token is missing (ensures Firestore access)
-                            await signInAnonymously(auth);
-                        }
-                    }
-                });
-
-            } catch (error) {
-                console.error("Firebase initialization failed:", error);
-                loadingScreen.innerHTML = '<p class="text-xl text-red-600 font-semibold">Failed to load the application. Check console for details.</p>';
+                localStorage.setItem(key, JSON.stringify(data));
+            } catch (e) {
+                console.error(`Error saving data to ${key}`, e);
             }
         }
+
+        /**
+         * Generates a simple unique ID (simulating Firestore/database ID).
+         */
+        function generateId() {
+            return 'id-' + Date.now() + Math.random().toString(16).slice(2);
+        }
+
+        /**
+         * Initializes the application state by loading data and setting up listeners.
+         */
+        function initializeApp() {
+            // Load and render initial state
+            updateAllData();
+
+            // Set up form submission handlers
+            roomForm.addEventListener('submit', handleRoomSubmit);
+            bookingForm.addEventListener('submit', handleBookingSubmit);
+        }
         
+        /**
+         * Refreshes and rerenders all data lists.
+         */
+        function updateAllData() {
+            // 1. Load Rooms
+            currentRooms = loadData(ROOMS_KEY).sort((a, b) => a.roomNumber.localeCompare(b.roomNumber));
+            availableRooms = currentRooms.filter(room => room.status === 'Vacant');
+            renderRooms(currentRooms);
+            
+            // 2. Load Bookings
+            const currentBookings = loadData(BOOKINGS_KEY).sort((a, b) => new Date(a.checkInDate) - new Date(b.checkInDate));
+            renderBookings(currentBookings);
+
+            // 3. Update UI counters
+            roomsCount.textContent = currentRooms.length;
+            bookingsCount.textContent = currentBookings.length;
+            
+            // 4. Update Room Select list in Booking Modal
+            populateRoomSelection(availableRooms);
+        }
+
         // --- UI & View Management ---
 
         window.switchView = function(viewName) {
@@ -315,38 +300,15 @@
             }
         }
 
-        function formatDate(timestamp) {
-            if (!timestamp) return 'N/A';
-            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            // Use dateString directly as it comes from input[type=date] (YYYY-MM-DD)
+            const date = new Date(dateString + 'T00:00:00'); 
             return date.toLocaleDateString('en-MY', { year: 'numeric', month: 'short', day: 'numeric' });
         }
-
-        // --- Room Management Functions ---
-
-        function startRoomListener() {
-            if (!isAuthReady || !userId) return;
-
-            const roomsColRef = collection(db, getCollectionPath('rooms'));
-            const q = query(roomsColRef, orderBy('roomNumber', 'asc'));
-
-            onSnapshot(q, (snapshot) => {
-                const rooms = [];
-                availableRooms = [];
-                snapshot.forEach(doc => {
-                    const room = { id: doc.id, ...doc.data() };
-                    rooms.push(room);
-                    if (room.status === 'Vacant') {
-                        availableRooms.push(room);
-                    }
-                });
-                renderRooms(rooms);
-                roomsCount.textContent = rooms.length;
-                populateRoomSelection(availableRooms);
-            }, (error) => {
-                console.error("Error fetching rooms:", error);
-            });
-        }
-
+        
+        // --- Room Management Handlers ---
+        
         function renderRooms(rooms) {
             roomsGrid.innerHTML = '';
             
@@ -390,10 +352,7 @@
                 noRoomsMessage.classList.add('hidden');
             }
         }
-
-        /**
-         * CRUD Handlers for Rooms
-         */
+        
         window.toggleRoomModal = function(show, mode = 'add') {
             const title = document.getElementById('room-modal-title');
             roomForm.reset();
@@ -419,28 +378,33 @@
             toggleRoomModal(true, 'edit');
         }
 
-        roomForm.addEventListener('submit', async (e) => {
+        function handleRoomSubmit(e) {
             e.preventDefault();
-            if (!isAuthReady) return console.error("Authentication not ready.");
 
             const id = document.getElementById('room-id').value;
             const number = document.getElementById('room-number').value.trim();
             const type = document.getElementById('room-type').value;
             const rate = parseFloat(document.getElementById('room-rate').value);
             const status = document.getElementById('room-status').value;
+            
+            let rooms = loadData(ROOMS_KEY);
+            const roomData = { id: id || generateId(), roomNumber: number, roomType: type, rate: rate, status: status, updatedAt: new Date().toISOString() };
 
-            const roomData = { roomNumber: number, roomType: type, rate: rate, status: status, updatedAt: serverTimestamp() };
-
-            const roomDocRef = id ? doc(db, getCollectionPath('rooms'), id) : doc(collection(db, getCollectionPath('rooms'))); 
-
-            try {
-                await setDoc(roomDocRef, roomData, { merge: true });
-                console.log("Room saved successfully:", roomDocRef.id);
-                toggleRoomModal(false);
-            } catch (error) {
-                console.error("Error saving room:", error);
+            if (id) {
+                // Update existing room
+                const index = rooms.findIndex(r => r.id === id);
+                if (index !== -1) {
+                    rooms[index] = roomData;
+                }
+            } else {
+                // Add new room
+                rooms.push(roomData);
             }
-        });
+            
+            saveData(ROOMS_KEY, rooms);
+            updateAllData();
+            toggleRoomModal(false);
+        }
         
         window.confirmDeleteRoom = function(roomId, roomNumber) {
             const confirmation = window.confirm(`Are you sure you want to delete Room ${roomNumber}? This cannot be undone.`);
@@ -449,38 +413,16 @@
             }
         }
 
-        async function deleteRoom(id, number) {
-            if (!isAuthReady) return console.error("Authentication not ready.");
-            const roomDocRef = doc(db, getCollectionPath('rooms'), id);
-            try {
-                await deleteDoc(roomDocRef);
-                console.log(`Room ${number} deleted successfully.`);
-            } catch (error) {
-                console.error(`Error deleting room ${number}:`, error);
-            }
+        function deleteRoom(id, number) {
+            let rooms = loadData(ROOMS_KEY);
+            rooms = rooms.filter(r => r.id !== id);
+            saveData(ROOMS_KEY, rooms);
+            updateAllData();
+            console.log(`Room ${number} deleted successfully.`);
         }
 
 
-        // --- Booking Management Functions ---
-
-        function startBookingListener() {
-            if (!isAuthReady || !userId) return;
-
-            const bookingsColRef = collection(db, getCollectionPath('bookings'));
-            // Order by check-in date
-            const q = query(bookingsColRef, orderBy('checkInDate', 'asc'));
-
-            onSnapshot(q, (snapshot) => {
-                const bookings = [];
-                snapshot.forEach(doc => {
-                    bookings.push({ id: doc.id, ...doc.data() });
-                });
-                renderBookings(bookings);
-                bookingsCount.textContent = bookings.length;
-            }, (error) => {
-                console.error("Error fetching bookings:", error);
-            });
-        }
+        // --- Booking Management Handlers ---
         
         function populateRoomSelection(rooms) {
             bookingRoomSelect.innerHTML = '<option value="">-- Select Available Room --</option>';
@@ -522,7 +464,7 @@
                                     class="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-100 transition duration-150" title="Edit Booking">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
                             </button>
-                            <button onclick="confirmDeleteBooking('${booking.id}', '${booking.guestName}')" 
+                            <button onclick="confirmDeleteBooking('${booking.id}', '${booking.roomNumber}', '${booking.guestName}')" 
                                     class="text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-100 transition duration-150" title="Cancel Booking">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" /></svg>
                             </button>
@@ -533,9 +475,6 @@
             });
         }
         
-        /**
-         * CRUD Handlers for Bookings
-         */
         window.toggleBookingModal = function(show, mode = 'add') {
             const title = document.getElementById('booking-modal-title');
             bookingForm.reset();
@@ -545,7 +484,6 @@
                 if (mode === 'add') {
                     title.textContent = 'Add New Booking';
                 }
-                // Ensure room selection is populated every time the modal opens
                 populateRoomSelection(availableRooms);
                 bookingModal.classList.remove('hidden');
             } else {
@@ -557,30 +495,26 @@
             document.getElementById('booking-id').value = id;
             document.getElementById('booking-modal-title').textContent = `Edit Booking for ${name}`;
             document.getElementById('booking-guest-name').value = name;
-            
-            // Format check-in/out dates from Firestore Timestamps to YYYY-MM-DD string for input[type=date]
-            const formatString = (ts) => {
-                if (typeof ts === 'string') return ts; // Already a string date
-                const date = ts.toDate ? ts.toDate() : new Date(ts);
-                return date.toISOString().split('T')[0];
-            };
-
-            // Use the formatter for dates
-            document.getElementById('booking-check-in').value = formatString(checkIn);
-            document.getElementById('booking-check-out').value = formatString(checkOut);
+            document.getElementById('booking-check-in').value = checkIn;
+            document.getElementById('booking-check-out').value = checkOut;
             document.getElementById('booking-total-cost').value = cost;
             
-            // Re-populate rooms and select the current room. 
-            // In a real edit scenario, the currently occupied room should be selectable.
-            populateRoomSelection([{ roomNumber: roomNumber, roomType: 'Current', rate: cost / 2 }, ...availableRooms], 'edit'); 
+            // To ensure the current occupied room is selectable when editing
+            let roomsForEdit = [...availableRooms];
+            if (!roomsForEdit.some(r => r.roomNumber === roomNumber)) {
+                const occupiedRoom = currentRooms.find(r => r.roomNumber === roomNumber);
+                if (occupiedRoom) {
+                     roomsForEdit.unshift(occupiedRoom);
+                }
+            }
+            populateRoomSelection(roomsForEdit); 
             document.getElementById('booking-room-number').value = roomNumber;
             
             toggleBookingModal(true, 'edit');
         }
 
-        bookingForm.addEventListener('submit', async (e) => {
+        function handleBookingSubmit(e) {
             e.preventDefault();
-            if (!isAuthReady) return console.error("Authentication not ready.");
 
             const id = document.getElementById('booking-id').value;
             const guestName = document.getElementById('booking-guest-name').value.trim();
@@ -590,8 +524,8 @@
             const totalCost = parseFloat(document.getElementById('booking-total-cost').value);
 
             if (checkInDate >= checkOutDate) {
+                 // Use a console error instead of alert/confirm
                  console.error("Validation Error: Check-out date must be after Check-in date.");
-                 // A custom UI modal should show this error, replacing window.alert/confirm
                  return;
             }
             if (!roomNumber) {
@@ -599,74 +533,85 @@
                  return;
             }
 
+            let bookings = loadData(BOOKINGS_KEY);
             const bookingData = {
+                id: id || generateId(),
                 guestName,
                 roomNumber,
                 checkInDate,
                 checkOutDate,
                 totalCost,
                 status: 'Confirmed',
-                bookedAt: serverTimestamp()
+                bookedAt: new Date().toISOString()
             };
+            
+            let originalRoomNumber = null;
+            
+            if (id) {
+                // Update existing booking
+                const index = bookings.findIndex(b => b.id === id);
+                if (index !== -1) {
+                    originalRoomNumber = bookings[index].roomNumber;
+                    bookings[index] = bookingData;
+                }
+            } else {
+                // Add new booking
+                bookings.push(bookingData);
+            }
+            
+            saveData(BOOKINGS_KEY, bookings);
 
-            const bookingDocRef = id 
-                ? doc(db, getCollectionPath('bookings'), id) 
-                : doc(collection(db, getCollectionPath('bookings'))); 
-
-            try {
-                await setDoc(bookingDocRef, bookingData, { merge: true });
-
-                // CRITICAL LOGIC: If a new booking is made, update the room status to 'Occupied'.
-                if (!id) {
-                    const roomToOccupy = availableRooms.find(r => r.roomNumber === roomNumber);
-                    if (roomToOccupy) {
-                        await setDoc(doc(db, getCollectionPath('rooms'), roomToOccupy.id), {
-                            status: 'Occupied'
-                        }, { merge: true });
+            // CRITICAL LOGIC: Update room status
+            if (!id || originalRoomNumber !== roomNumber) {
+                // 1. Mark new room as Occupied (only if adding new or changing rooms)
+                const newRoom = currentRooms.find(r => r.roomNumber === roomNumber);
+                if (newRoom) {
+                    newRoom.status = 'Occupied';
+                }
+                
+                // 2. Mark old room as Vacant (only if changing rooms)
+                if (originalRoomNumber && originalRoomNumber !== roomNumber) {
+                    const oldRoom = currentRooms.find(r => r.roomNumber === originalRoomNumber);
+                    if (oldRoom) {
+                        oldRoom.status = 'Vacant';
                     }
                 }
-
-                console.log("Booking saved successfully:", bookingDocRef.id);
-                toggleBookingModal(false);
-            } catch (error) {
-                console.error("Error saving booking:", error);
+                
+                saveData(ROOMS_KEY, currentRooms);
             }
-        });
+
+
+            updateAllData();
+            toggleBookingModal(false);
+            console.log("Booking saved successfully.");
+        }
         
-        window.confirmDeleteBooking = function(bookingId, guestName) {
-            const confirmation = window.confirm(`Are you sure you want to cancel the booking for ${guestName}? This will set the room status back to Vacant.`);
+        window.confirmDeleteBooking = function(bookingId, roomNumber, guestName) {
+            const confirmation = window.confirm(`Are you sure you want to cancel the booking for ${guestName} (Room ${roomNumber})? This will set the room status back to Vacant.`);
             if (confirmation) {
-                deleteBooking(bookingId, name);
+                deleteBooking(bookingId, roomNumber, guestName);
             }
         }
 
-        async function deleteBooking(id, name) {
-            if (!isAuthReady) return console.error("Authentication not ready.");
-            const bookingDocRef = doc(db, getCollectionPath('bookings'), id);
-            
-            // Find the room associated with the booking to update its status
-            // NOTE: A more robust solution would retrieve the booking first to get the roomNumber
-            const roomNumberToFree = document.querySelector(`#bookings-list div[onclick*="${id}"] span.font-semibold`).textContent;
+        function deleteBooking(id, roomNumber, name) {
+            // 1. Remove booking record
+            let bookings = loadData(BOOKINGS_KEY);
+            bookings = bookings.filter(b => b.id !== id);
+            saveData(BOOKINGS_KEY, bookings);
 
-            try {
-                await deleteDoc(bookingDocRef);
-
-                // Attempt to free the room
-                const roomDoc = availableRooms.find(r => r.roomNumber === roomNumberToFree || r.status !== 'Vacant');
-                if (roomDoc) {
-                     await setDoc(doc(db, getCollectionPath('rooms'), roomDoc.id), {
-                        status: 'Vacant'
-                     }, { merge: true });
-                }
-
-                console.log(`Booking for ${name} cancelled successfully. Room ${roomNumberToFree} set to Vacant.`);
-            } catch (error) {
-                console.error(`Error deleting booking for ${name}:`, error);
+            // 2. Free up the room (set status to Vacant)
+            const roomToFree = currentRooms.find(r => r.roomNumber === roomNumber);
+            if (roomToFree) {
+                roomToFree.status = 'Vacant';
+                saveData(ROOMS_KEY, currentRooms);
             }
+
+            updateAllData();
+            console.log(`Booking for ${name} cancelled successfully. Room ${roomNumber} set to Vacant.`);
         }
 
         // --- Start Application ---
-        initializeFirebase();
+        document.addEventListener('DOMContentLoaded', initializeApp);
         window.onload = () => switchView('inventory');
     </script>
 </body>
