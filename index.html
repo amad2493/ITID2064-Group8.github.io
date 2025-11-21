@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hotel Booking System Management</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        /* Custom styles for the color-coded room status */
+        .status-Vacant { background-color: #D1FAE5; color: #065F46; border-left: 4px solid #10B981; } /* Green */
+        .status-Occupied { background-color: #FEE2E2; color: #991B1B; border-left: 4px solid #F87171; } /* Red */
+        .status-Cleaning { background-color: #FEF3C7; color: #92400E; border-left: 4px solid #F59E0B; } /* Yellow */
+        .status-Maintenance { background-color: #E0F2F1; color: #0E7490; border-left: 4px solid #2DD4BF; } /* Cyan */
+        .tab-active { border-bottom: 3px solid #4F46E5; font-weight: 600; color: #4F46E5; }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+    <div id="loading" class="loading-overlay">
+        <div class="flex flex-col items-center">
+            <svg class="animate-spin h-10 w-10 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-4 text-gray-700">Initializing Database and Authentication...</p>
+        </div>
+    </div>
+
+    <div id="app" class="container mx-auto p-4 sm:p-6 lg:p-8 hidden">
+        <header class="mb-8 border-b pb-4">
+            <h1 class="text-3xl font-bold text-gray-800">Hotel Booking System - Admin Portal</h1>
+            <p class="text-sm text-gray-500 mt-1">Manage room inventory and guest reservations in real-time.</p>
+            <p id="user-info" class="text-xs mt-2 text-indigo-600 font-medium"></p>
+        </header>
+        
+        <!-- TABS FOR NAVIGATION -->
+        <nav class="flex space-x-6 border-b mb-6">
+            <button id="tab-inventory" onclick="switchView('inventory')" class="py-2 px-3 text-sm text-gray-600 hover:text-indigo-600 transition duration-150 tab-active">
+                Room Inventory
+            </button>
+            <button id="tab-bookings" onclick="switchView('bookings')" class="py-2 px-3 text-sm text-gray-600 hover:text-indigo-600 transition duration-150">
+                Current Bookings
+            </button>
+        </nav>
+
+
+        <!-- ROOM INVENTORY VIEW -->
+        <div id="inventory-view" class="view-content">
+            <!-- ADD NEW ROOM FORM/MODAL TRIGGER -->
+            <div class="mb-6 flex justify-between items-center">
+                <button onclick="toggleRoomModal(true)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
+                    + Add New Room
+                </button>
+                <div class="text-sm font-medium text-gray-700">
+                    Total Rooms: <span id="total-rooms" class="text-indigo-600 font-bold">0</span>
+                </div>
+            </div>
+            
+            <!-- ROOMS GRID -->
+            <div id="rooms-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <!-- Room cards will be inserted here by JavaScript -->
+            </div>
+
+            <!-- NO ROOMS FOUND MESSAGE -->
+            <div id="no-rooms-message" class="hidden text-center p-10 bg-white rounded-xl shadow-lg mt-8">
+                <p class="text-lg text-gray-500">No rooms found in the inventory. Click "Add New Room" to get started!</p>
+            </div>
+        </div>
+
+        <!-- BOOKINGS VIEW -->
+        <div id="bookings-view" class="view-content hidden">
+            <!-- ADD NEW BOOKING FORM/MODAL TRIGGER -->
+            <div class="mb-6 flex justify-between items-center">
+                <button onclick="toggleBookingModal(true)" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
+                    + Add New Booking
+                </button>
+                <div class="text-sm font-medium text-gray-700">
+                    Active Bookings: <span id="active-bookings" class="text-blue-600 font-bold">0</span>
+                </div>
+            </div>
+            
+            <!-- BOOKINGS LIST -->
+            <div id="bookings-list" class="flex flex-col space-y-4">
+                <!-- Booking cards/list items will be inserted here by JavaScript -->
+            </div>
+             <!-- NO BOOKINGS FOUND MESSAGE -->
+            <div id="no-bookings-message" class="hidden text-center p-10 bg-white rounded-xl shadow-lg mt-8">
+                <p class="text-lg text-gray-500">No active bookings found. Click "Add New Booking" to create a reservation.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL FOR ADD/EDIT ROOM -->
+    <div id="room-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 hidden" onclick="if(event.target.id === 'room-modal') toggleRoomModal(false)">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
+            <h3 id="room-modal-title" class="text-xl font-bold text-gray-900 mb-4">Add New Room</h3>
+            <form id="room-form">
+                <input type="hidden" id="room-id">
+                
+                <div class="mb-4">
+                    <label for="room-number" class="block text-sm font-medium text-gray-700">Room Number</label>
+                    <input type="text" id="room-number" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="room-type" class="block text-sm font-medium text-gray-700">Room Type</label>
+                    <select id="room-type" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border">
+                        <option value="Standard">Standard</option>
+                        <option value="Deluxe">Deluxe</option>
+                        <option value="Suite">Suite</option>
+                    </select>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="room-rate" class="block text-sm font-medium text-gray-700">Nightly Rate (MYR)</label>
+                    <input type="number" id="room-rate" required min="50" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border">
+                </div>
+
+                <div class="mb-4">
+                    <label for="room-status" class="block text-sm font-medium text-gray-700">Status</label>
+                    <select id="room-status" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2 border">
+                        <option value="Vacant">Vacant</option>
+                        <option value="Occupied">Occupied</option>
+                        <option value="Cleaning">Cleaning</option>
+                        <option value="Maintenance">Maintenance</option>
+                    </select>
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="toggleRoomModal(false)" class="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition duration-150">
+                        Cancel
+                    </button>
+                    <button type="submit" id="save-room-button" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition duration-150">
+                        Save Room
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- MODAL FOR ADD/EDIT BOOKING -->
+    <div id="booking-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 hidden" onclick="if(event.target.id === 'booking-modal') toggleBookingModal(false)">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
+            <h3 id="booking-modal-title" class="text-xl font-bold text-gray-900 mb-4">Add New Booking</h3>
+            <form id="booking-form">
+                <input type="hidden" id="booking-id">
+                
+                <div class="mb-4">
+                    <label for="booking-guest-name" class="block text-sm font-medium text-gray-700">Guest Name</label>
+                    <input type="text" id="booking-guest-name" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border">
+                </div>
+
+                <div class="mb-4">
+                    <label for="booking-room-number" class="block text-sm font-medium text-gray-700">Room Number</label>
+                    <select id="booking-room-number" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border">
+                        <option value="">-- Select Available Room --</option>
+                        <!-- Options filled by JS -->
+                    </select>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="booking-check-in" class="block text-sm font-medium text-gray-700">Check-in Date</label>
+                    <input type="date" id="booking-check-in" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="booking-check-out" class="block text-sm font-medium text-gray-700">Check-out Date</label>
+                    <input type="date" id="booking-check-out" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border">
+                </div>
+
+                <div class="mb-4">
+                    <label for="booking-total-cost" class="block text-sm font-medium text-gray-700">Total Cost (MYR)</label>
+                    <input type="number" id="booking-total-cost" required min="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border">
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="toggleBookingModal(false)" class="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition duration-150">
+                        Cancel
+                    </button>
+                    <button type="submit" id="save-booking-button" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150">
+                        Save Booking
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- FIREBASE AND JAVASCRIPT LOGIC -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp, setLogLevel } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, collection, onSnapshot, setDoc, deleteDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // Global Firebase variables provided by the Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        let db;
+        let auth;
+        let userId = null;
+        let isAuthReady = false;
+        let availableRooms = []; // Stores current vacant rooms for booking selection
+
+        // UI elements
+        const roomsGrid = document.getElementById('rooms-grid');
+        const roomsCount = document.getElementById('total-rooms');
+        const bookingsList = document.getElementById('bookings-list');
+        const bookingsCount = document.getElementById('active-bookings');
+        const userInfo = document.getElementById('user-info');
+        const loadingScreen = document.getElementById('loading');
+        const appContainer = document.getElementById('app');
+        const noRoomsMessage = document.getElementById('no-rooms-message');
+        const noBookingsMessage = document.getElementById('no-bookings-message');
+        
+        const roomModal = document.getElementById('room-modal');
+        const roomForm = document.getElementById('room-form');
+        const bookingModal = document.getElementById('booking-modal');
+        const bookingForm = document.getElementById('booking-form');
+        const bookingRoomSelect = document.getElementById('booking-room-number');
+        const inventoryView = document.getElementById('inventory-view');
+        const bookingsView = document.getElementById('bookings-view');
+        const tabInventory = document.getElementById('tab-inventory');
+        const tabBookings = document.getElementById('tab-bookings');
+
+        let currentView = 'inventory';
+
+        // --- Core Utility Functions ---
+
+        function getCollectionPath(name) {
+            // Using the public data path so all users can see/manage the same inventory/bookings
+            return `artifacts/${appId}/public/data/${name}`;
+        }
+
+        /**
+         * Initializes Firebase and authenticates the user.
+         */
+        async function initializeFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                setLogLevel('error');
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        userInfo.textContent = `Authenticated User ID: ${userId}`;
+                        isAuthReady = true;
+                        appContainer.classList.remove('hidden');
+                        loadingScreen.classList.add('hidden');
+                        startRoomListener();
+                        startBookingListener();
+                    } else {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                loadingScreen.innerHTML = '<p class="text-red-600">Failed to load the application. Check console for details.</p>';
+            }
+        }
+        
+        // --- UI & View Management ---
+
+        window.switchView = function(viewName) {
+            currentView = viewName;
+            tabInventory.classList.remove('tab-active');
+            tabBookings.classList.remove('tab-active');
+            inventoryView.classList.add('hidden');
+            bookingsView.classList.add('hidden');
+
+            if (viewName === 'inventory') {
+                tabInventory.classList.add('tab-active');
+                inventoryView.classList.remove('hidden');
+            } else if (viewName === 'bookings') {
+                tabBookings.classList.add('tab-active');
+                bookingsView.classList.remove('hidden');
+            }
+        }
+
+        function formatDate(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return date.toLocaleDateString('en-MY', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        // --- Room Management Functions ---
+
+        function startRoomListener() {
+            if (!isAuthReady || !userId) return;
+
+            const roomsColRef = collection(db, getCollectionPath('rooms'));
+            const q = query(roomsColRef, orderBy('roomNumber', 'asc'));
+
+            onSnapshot(q, (snapshot) => {
+                const rooms = [];
+                availableRooms = [];
+                snapshot.forEach(doc => {
+                    const room = { id: doc.id, ...doc.data() };
+                    rooms.push(room);
+                    if (room.status === 'Vacant') {
+                        availableRooms.push(room);
+                    }
+                });
+                renderRooms(rooms);
+                roomsCount.textContent = rooms.length;
+                populateRoomSelection(availableRooms);
+            }, (error) => {
+                console.error("Error fetching rooms:", error);
+            });
+        }
+
+        function renderRooms(rooms) {
+            roomsGrid.innerHTML = '';
+            
+            rooms.forEach(room => {
+                const card = document.createElement('div');
+                const rateDisplay = typeof room.rate === 'number' ? room.rate.toFixed(2) : parseFloat(room.rate || 0).toFixed(2);
+                
+                card.className = `p-5 rounded-xl shadow-lg transition duration-300 transform hover:scale-[1.02] ${room.status ? 'status-' + room.status : 'bg-gray-100'}`;
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="text-2xl font-extrabold">${room.roomNumber}</h2>
+                        <span class="text-xs font-semibold uppercase px-3 py-1 rounded-full border border-indigo-300 bg-indigo-50 text-indigo-700">
+                            ${room.roomType}
+                        </span>
+                    </div>
+                    <div class="mb-4">
+                        <p class="text-gray-600 text-sm">Rate: <span class="font-bold text-lg text-indigo-700">MYR ${rateDisplay}</span></p>
+                        <p class="text-gray-700 font-medium mt-1">Status: ${room.status}</p>
+                    </div>
+                    <div class="flex justify-end space-x-2">
+                        <button onclick="editRoom('${room.id}', '${room.roomNumber}', '${room.roomType}', ${room.rate}, '${room.status}')" 
+                                class="text-indigo-600 hover:text-indigo-800 p-2 rounded-full hover:bg-indigo-100 transition duration-150" title="Edit Room">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                        </button>
+                        <button onclick="confirmDeleteRoom('${room.id}', '${room.roomNumber}')" 
+                                class="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-100 transition duration-150" title="Delete Room">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                roomsGrid.appendChild(card);
+            });
+            if (rooms.length === 0) {
+                noRoomsMessage.classList.remove('hidden');
+            } else {
+                noRoomsMessage.classList.add('hidden');
+            }
+        }
+
+        /**
+         * CRUD Handlers for Rooms
+         */
+        window.toggleRoomModal = function(show, mode = 'add') {
+            const title = document.getElementById('room-modal-title');
+            roomForm.reset();
+            document.getElementById('room-id').value = '';
+            
+            if (show) {
+                if (mode === 'add') {
+                    title.textContent = 'Add New Room';
+                }
+                roomModal.classList.remove('hidden');
+            } else {
+                roomModal.classList.add('hidden');
+            }
+        }
+        
+        window.editRoom = function(id, number, type, rate, status) {
+            document.getElementById('room-id').value = id;
+            document.getElementById('room-modal-title').textContent = `Edit Room ${number}`;
+            document.getElementById('room-number').value = number;
+            document.getElementById('room-type').value = type;
+            document.getElementById('room-rate').value = rate;
+            document.getElementById('room-status').value = status;
+            toggleRoomModal(true, 'edit');
+        }
+
+        roomForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!isAuthReady) return console.error("Authentication not ready.");
+
+            const id = document.getElementById('room-id').value;
+            const number = document.getElementById('room-number').value.trim();
+            const type = document.getElementById('room-type').value;
+            const rate = parseFloat(document.getElementById('room-rate').value);
+            const status = document.getElementById('room-status').value;
+
+            const roomData = { roomNumber: number, roomType: type, rate: rate, status: status, updatedAt: serverTimestamp() };
+
+            const roomDocRef = id ? doc(db, getCollectionPath('rooms'), id) : doc(collection(db, getCollectionPath('rooms'))); 
+
+            try {
+                await setDoc(roomDocRef, roomData, { merge: true });
+                console.log("Room saved successfully:", roomDocRef.id);
+                toggleRoomModal(false);
+            } catch (error) {
+                console.error("Error saving room:", error);
+            }
+        });
+        
+        window.confirmDeleteRoom = function(roomId, roomNumber) {
+            const confirmation = window.confirm(`Are you sure you want to delete Room ${roomNumber}? This cannot be undone.`);
+            if (confirmation) {
+                deleteRoom(roomId, roomNumber);
+            }
+        }
+
+        async function deleteRoom(id, number) {
+            if (!isAuthReady) return console.error("Authentication not ready.");
+            const roomDocRef = doc(db, getCollectionPath('rooms'), id);
+            try {
+                await deleteDoc(roomDocRef);
+                console.log(`Room ${number} deleted successfully.`);
+            } catch (error) {
+                console.error(`Error deleting room ${number}:`, error);
+            }
+        }
+
+
+        // --- Booking Management Functions ---
+
+        function startBookingListener() {
+            if (!isAuthReady || !userId) return;
+
+            const bookingsColRef = collection(db, getCollectionPath('bookings'));
+            // Order by check-in date
+            const q = query(bookingsColRef, orderBy('checkInDate', 'asc'));
+
+            onSnapshot(q, (snapshot) => {
+                const bookings = [];
+                snapshot.forEach(doc => {
+                    bookings.push({ id: doc.id, ...doc.data() });
+                });
+                renderBookings(bookings);
+                bookingsCount.textContent = bookings.length;
+            }, (error) => {
+                console.error("Error fetching bookings:", error);
+            });
+        }
+        
+        function populateRoomSelection(rooms) {
+            bookingRoomSelect.innerHTML = '<option value="">-- Select Available Room --</option>';
+            rooms.forEach(room => {
+                const option = document.createElement('option');
+                option.value = room.roomNumber;
+                option.textContent = `${room.roomNumber} (${room.roomType} - MYR ${room.rate.toFixed(2)})`;
+                bookingRoomSelect.appendChild(option);
+            });
+        }
+
+        function renderBookings(bookings) {
+            bookingsList.innerHTML = '';
+            
+            if (bookings.length === 0) {
+                noBookingsMessage.classList.remove('hidden');
+                return;
+            }
+            noBookingsMessage.classList.add('hidden');
+
+            bookings.forEach(booking => {
+                const item = document.createElement('div');
+                item.className = 'p-4 bg-white rounded-lg shadow-md border-l-4 border-blue-500 flex justify-between items-center';
+                
+                const costDisplay = typeof booking.totalCost === 'number' ? booking.totalCost.toFixed(2) : parseFloat(booking.totalCost || 0).toFixed(2);
+                
+                item.innerHTML = `
+                    <div>
+                        <p class="text-lg font-bold text-gray-800">${booking.guestName}</p>
+                        <p class="text-sm text-gray-600">Room: <span class="font-semibold">${booking.roomNumber}</span></p>
+                        <p class="text-sm text-gray-500">
+                            Check-in: ${formatDate(booking.checkInDate)} $\rightarrow$ Check-out: ${formatDate(booking.checkOutDate)}
+                        </p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xl font-extrabold text-blue-700">MYR ${costDisplay}</p>
+                        <div class="flex space-x-2 mt-2">
+                            <button onclick="editBooking('${booking.id}', '${booking.guestName}', '${booking.roomNumber}', '${booking.checkInDate}', '${booking.checkOutDate}', ${booking.totalCost})" 
+                                    class="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-100 transition duration-150" title="Edit Booking">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+                            </button>
+                            <button onclick="confirmDeleteBooking('${booking.id}', '${booking.guestName}')" 
+                                    class="text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-100 transition duration-150" title="Cancel Booking">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" /></svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                bookingsList.appendChild(item);
+            });
+        }
+        
+        /**
+         * CRUD Handlers for Bookings
+         */
+        window.toggleBookingModal = function(show, mode = 'add') {
+            const title = document.getElementById('booking-modal-title');
+            bookingForm.reset();
+            document.getElementById('booking-id').value = '';
+            
+            if (show) {
+                if (mode === 'add') {
+                    title.textContent = 'Add New Booking';
+                }
+                // Ensure room selection is populated every time the modal opens
+                populateRoomSelection(availableRooms);
+                bookingModal.classList.remove('hidden');
+            } else {
+                bookingModal.classList.add('hidden');
+            }
+        }
+        
+        window.editBooking = function(id, name, roomNumber, checkIn, checkOut, cost) {
+            document.getElementById('booking-id').value = id;
+            document.getElementById('booking-modal-title').textContent = `Edit Booking for ${name}`;
+            document.getElementById('booking-guest-name').value = name;
+            document.getElementById('booking-check-in').value = checkIn.split('T')[0]; // Format date
+            document.getElementById('booking-check-out').value = checkOut.split('T')[0]; // Format date
+            document.getElementById('booking-total-cost').value = cost;
+            
+            // Re-populate rooms and select the current room, even if occupied (for editing)
+            populateRoomSelection([{ roomNumber: roomNumber, roomType: 'Current', rate: cost / 2 }], 'edit'); 
+            document.getElementById('booking-room-number').value = roomNumber;
+            
+            toggleBookingModal(true, 'edit');
+        }
+
+        bookingForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!isAuthReady) return console.error("Authentication not ready.");
+
+            const id = document.getElementById('booking-id').value;
+            const guestName = document.getElementById('booking-guest-name').value.trim();
+            const roomNumber = document.getElementById('booking-room-number').value;
+            const checkInDate = document.getElementById('booking-check-in').value;
+            const checkOutDate = document.getElementById('booking-check-out').value;
+            const totalCost = parseFloat(document.getElementById('booking-total-cost').value);
+
+            if (checkInDate >= checkOutDate) {
+                 // Custom message box logic required here instead of alert()
+                 console.error("Check-out date must be after Check-in date.");
+                 return;
+            }
+
+            const bookingData = {
+                guestName,
+                roomNumber,
+                checkInDate,
+                checkOutDate,
+                totalCost,
+                status: 'Confirmed',
+                bookedAt: serverTimestamp()
+            };
+
+            const bookingDocRef = id 
+                ? doc(db, getCollectionPath('bookings'), id) 
+                : doc(collection(db, getCollectionPath('bookings'))); 
+
+            try {
+                await setDoc(bookingDocRef, bookingData, { merge: true });
+
+                // CRITICAL LOGIC: If a new booking is made, update the room status to 'Occupied'.
+                if (!id) {
+                    const roomDocRef = availableRooms.find(r => r.roomNumber === roomNumber);
+                    if (roomDocRef) {
+                        await setDoc(doc(db, getCollectionPath('rooms'), roomDocRef.id), {
+                            status: 'Occupied'
+                        }, { merge: true });
+                    }
+                }
+
+                console.log("Booking saved successfully:", bookingDocRef.id);
+                toggleBookingModal(false);
+            } catch (error) {
+                console.error("Error saving booking:", error);
+            }
+        });
+        
+        window.confirmDeleteBooking = function(bookingId, guestName) {
+            const confirmation = window.confirm(`Are you sure you want to cancel the booking for ${guestName}?`);
+            if (confirmation) {
+                deleteBooking(bookingId, guestName);
+            }
+        }
+
+        async function deleteBooking(id, name) {
+            if (!isAuthReady) return console.error("Authentication not ready.");
+            const bookingDocRef = doc(db, getCollectionPath('bookings'), id);
+            
+            // In a real system, you would also need logic here to find the room 
+            // associated with the booking and set its status back to 'Vacant' 
+            // before deleting the booking document.
+
+            try {
+                await deleteDoc(bookingDocRef);
+                console.log(`Booking for ${name} cancelled successfully.`);
+            } catch (error) {
+                console.error(`Error deleting booking for ${name}:`, error);
+            }
+        }
+
+        // --- Start Application ---
+        initializeFirebase();
+        switchView('inventory'); // Start on the inventory view
+    </script>
+</body>
+</html>
