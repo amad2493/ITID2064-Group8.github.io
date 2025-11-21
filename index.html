@@ -218,7 +218,7 @@
         let auth;
         let userId = null;
         let isAuthReady = false;
-        let availableRooms = []; // Stores current vacant rooms for booking selection
+        let availableRooms = []; 
 
         // UI elements
         const roomsGrid = document.getElementById('rooms-grid');
@@ -255,6 +255,17 @@
          */
         async function initializeFirebase() {
             try {
+                // *** CRITICAL DEPLOYMENT CHECK ***
+                // If firebaseConfig is empty (which happens if environment variables aren't injected, 
+                // e.g., on GitHub Pages), we must avoid calling initializeApp with an empty object,
+                // which often leads to the "Failed to load" error.
+                if (Object.keys(firebaseConfig).length === 0 && appId === 'default-app-id') {
+                    console.error("Firebase Configuration Missing. Cannot initialize database.");
+                    loadingScreen.innerHTML = '<p class="text-xl text-red-600 font-semibold">ERROR: Firebase Configuration Missing. This application only runs in an authenticated environment (like Canvas).</p><p class="mt-2 text-gray-700">The interactive features (CRUD/Real-time) will not work on static hosts like GitHub Pages.</p>';
+                    appContainer.classList.remove('hidden');
+                    return; 
+                }
+                
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
@@ -274,6 +285,7 @@
                         if (initialAuthToken) {
                             await signInWithCustomToken(auth, initialAuthToken);
                         } else {
+                            // Fallback to anonymous sign-in if token is missing (ensures Firestore access)
                             await signInAnonymously(auth);
                         }
                     }
@@ -281,7 +293,7 @@
 
             } catch (error) {
                 console.error("Firebase initialization failed:", error);
-                loadingScreen.innerHTML = '<p class="text-red-600">Failed to load the application. Check console for details.</p>';
+                loadingScreen.innerHTML = '<p class="text-xl text-red-600 font-semibold">Failed to load the application. Check console for details.</p>';
             }
         }
         
@@ -545,12 +557,22 @@
             document.getElementById('booking-id').value = id;
             document.getElementById('booking-modal-title').textContent = `Edit Booking for ${name}`;
             document.getElementById('booking-guest-name').value = name;
-            document.getElementById('booking-check-in').value = checkIn.split('T')[0]; // Format date
-            document.getElementById('booking-check-out').value = checkOut.split('T')[0]; // Format date
+            
+            // Format check-in/out dates from Firestore Timestamps to YYYY-MM-DD string for input[type=date]
+            const formatString = (ts) => {
+                if (typeof ts === 'string') return ts; // Already a string date
+                const date = ts.toDate ? ts.toDate() : new Date(ts);
+                return date.toISOString().split('T')[0];
+            };
+
+            // Use the formatter for dates
+            document.getElementById('booking-check-in').value = formatString(checkIn);
+            document.getElementById('booking-check-out').value = formatString(checkOut);
             document.getElementById('booking-total-cost').value = cost;
             
-            // Re-populate rooms and select the current room, even if occupied (for editing)
-            populateRoomSelection([{ roomNumber: roomNumber, roomType: 'Current', rate: cost / 2 }], 'edit'); 
+            // Re-populate rooms and select the current room. 
+            // In a real edit scenario, the currently occupied room should be selectable.
+            populateRoomSelection([{ roomNumber: roomNumber, roomType: 'Current', rate: cost / 2 }, ...availableRooms], 'edit'); 
             document.getElementById('booking-room-number').value = roomNumber;
             
             toggleBookingModal(true, 'edit');
@@ -568,8 +590,12 @@
             const totalCost = parseFloat(document.getElementById('booking-total-cost').value);
 
             if (checkInDate >= checkOutDate) {
-                 // Custom message box logic required here instead of alert()
-                 console.error("Check-out date must be after Check-in date.");
+                 console.error("Validation Error: Check-out date must be after Check-in date.");
+                 // A custom UI modal should show this error, replacing window.alert/confirm
+                 return;
+            }
+            if (!roomNumber) {
+                 console.error("Validation Error: Please select a room.");
                  return;
             }
 
@@ -592,9 +618,9 @@
 
                 // CRITICAL LOGIC: If a new booking is made, update the room status to 'Occupied'.
                 if (!id) {
-                    const roomDocRef = availableRooms.find(r => r.roomNumber === roomNumber);
-                    if (roomDocRef) {
-                        await setDoc(doc(db, getCollectionPath('rooms'), roomDocRef.id), {
+                    const roomToOccupy = availableRooms.find(r => r.roomNumber === roomNumber);
+                    if (roomToOccupy) {
+                        await setDoc(doc(db, getCollectionPath('rooms'), roomToOccupy.id), {
                             status: 'Occupied'
                         }, { merge: true });
                     }
@@ -608,9 +634,9 @@
         });
         
         window.confirmDeleteBooking = function(bookingId, guestName) {
-            const confirmation = window.confirm(`Are you sure you want to cancel the booking for ${guestName}?`);
+            const confirmation = window.confirm(`Are you sure you want to cancel the booking for ${guestName}? This will set the room status back to Vacant.`);
             if (confirmation) {
-                deleteBooking(bookingId, guestName);
+                deleteBooking(bookingId, name);
             }
         }
 
@@ -618,13 +644,22 @@
             if (!isAuthReady) return console.error("Authentication not ready.");
             const bookingDocRef = doc(db, getCollectionPath('bookings'), id);
             
-            // In a real system, you would also need logic here to find the room 
-            // associated with the booking and set its status back to 'Vacant' 
-            // before deleting the booking document.
+            // Find the room associated with the booking to update its status
+            // NOTE: A more robust solution would retrieve the booking first to get the roomNumber
+            const roomNumberToFree = document.querySelector(`#bookings-list div[onclick*="${id}"] span.font-semibold`).textContent;
 
             try {
                 await deleteDoc(bookingDocRef);
-                console.log(`Booking for ${name} cancelled successfully.`);
+
+                // Attempt to free the room
+                const roomDoc = availableRooms.find(r => r.roomNumber === roomNumberToFree || r.status !== 'Vacant');
+                if (roomDoc) {
+                     await setDoc(doc(db, getCollectionPath('rooms'), roomDoc.id), {
+                        status: 'Vacant'
+                     }, { merge: true });
+                }
+
+                console.log(`Booking for ${name} cancelled successfully. Room ${roomNumberToFree} set to Vacant.`);
             } catch (error) {
                 console.error(`Error deleting booking for ${name}:`, error);
             }
@@ -632,7 +667,7 @@
 
         // --- Start Application ---
         initializeFirebase();
-        switchView('inventory'); // Start on the inventory view
+        window.onload = () => switchView('inventory');
     </script>
 </body>
 </html>
