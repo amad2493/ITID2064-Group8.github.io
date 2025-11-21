@@ -168,7 +168,9 @@
 
                 <div class="mb-4">
                     <label for="booking-total-cost" class="block text-sm font-medium text-gray-700">Total Cost (MYR)</label>
-                    <input type="number" id="booking-total-cost" required min="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border">
+                    <!-- Readonly to show it's auto-calculated -->
+                    <input type="number" id="booking-total-cost" required min="1" readonly class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border bg-gray-100">
+                    <small class="text-xs text-gray-500 mt-1">Calculated automatically based on room rate and nights.</small>
                 </div>
 
                 <div class="flex justify-end space-x-3">
@@ -205,6 +207,9 @@
         const bookingModal = document.getElementById('booking-modal');
         const bookingForm = document.getElementById('booking-form');
         const bookingRoomSelect = document.getElementById('booking-room-number');
+        const bookingCheckIn = document.getElementById('booking-check-in');
+        const bookingCheckOut = document.getElementById('booking-check-out');
+        const bookingTotalCost = document.getElementById('booking-total-cost');
         const inventoryView = document.getElementById('inventory-view');
         const bookingsView = document.getElementById('bookings-view');
         const tabInventory = document.getElementById('tab-inventory');
@@ -250,6 +255,21 @@
         }
 
         /**
+         * Calculates the difference in days between two YYYY-MM-DD date strings.
+         * @param {string} date1 - Check-in date string.
+         * @param {string} date2 - Check-out date string.
+         * @returns {number} Number of nights (days difference).
+         */
+        function calculateNights(date1, date2) {
+            if (!date1 || !date2 || date1 >= date2) return 0;
+            const d1 = new Date(date1 + 'T00:00:00');
+            const d2 = new Date(date2 + 'T00:00:00');
+            const diffTime = Math.abs(d2 - d1);
+            // Convert milliseconds to days
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        /**
          * Initializes the application state by loading data and setting up listeners.
          */
         function initializeApp() {
@@ -259,6 +279,11 @@
             // Set up form submission handlers
             roomForm.addEventListener('submit', handleRoomSubmit);
             bookingForm.addEventListener('submit', handleBookingSubmit);
+            
+            // Set up event listeners for automatic cost calculation
+            bookingRoomSelect.addEventListener('change', autoCalculateCost);
+            bookingCheckIn.addEventListener('change', autoCalculateCost);
+            bookingCheckOut.addEventListener('change', autoCalculateCost);
         }
         
         /**
@@ -368,15 +393,18 @@
             }
         }
         
+        // --- Room Edit Memory Fix ---
         window.editRoom = function(id, number, type, rate, status) {
             document.getElementById('room-id').value = id;
             document.getElementById('room-modal-title').textContent = `Edit Room ${number}`;
             document.getElementById('room-number').value = number;
             document.getElementById('room-type').value = type;
             document.getElementById('room-rate').value = rate;
-            document.getElementById('room-status').value = status;
+            // Set the correct status value in the dropdown
+            document.getElementById('room-status').value = status; 
             toggleRoomModal(true, 'edit');
         }
+        // --- End Room Edit Memory Fix ---
 
         function handleRoomSubmit(e) {
             e.preventDefault();
@@ -388,6 +416,12 @@
             const status = document.getElementById('room-status').value;
             
             let rooms = loadData(ROOMS_KEY);
+            // Check for duplicate room number only on *new* entry
+            if (!id && rooms.some(r => r.roomNumber.toLowerCase() === number.toLowerCase())) {
+                 console.error(`Validation Error: Room number ${number} already exists.`);
+                 return;
+            }
+            
             const roomData = { id: id || generateId(), roomNumber: number, roomType: type, rate: rate, status: status, updatedAt: new Date().toISOString() };
 
             if (id) {
@@ -407,6 +441,13 @@
         }
         
         window.confirmDeleteRoom = function(roomId, roomNumber) {
+            // Check if any booking uses this room before deleting
+            const bookings = loadData(BOOKINGS_KEY);
+            if (bookings.some(b => b.roomNumber === roomNumber)) {
+                console.error(`Error: Cannot delete Room ${roomNumber}. It is currently associated with an active booking.`);
+                return;
+            }
+
             const confirmation = window.confirm(`Are you sure you want to delete Room ${roomNumber}? This cannot be undone.`);
             if (confirmation) {
                 deleteRoom(roomId, roomNumber);
@@ -423,6 +464,30 @@
 
 
         // --- Booking Management Handlers ---
+
+        function autoCalculateCost() {
+            const roomNumber = bookingRoomSelect.value;
+            const checkIn = bookingCheckIn.value;
+            const checkOut = bookingCheckOut.value;
+
+            if (!roomNumber || !checkIn || !checkOut || checkIn >= checkOut) {
+                bookingTotalCost.value = 0;
+                return;
+            }
+
+            const nights = calculateNights(checkIn, checkOut);
+            
+            // Find the room rate based on the selected room number (it might be in availableRooms or currentRooms)
+            const selectedRoom = currentRooms.find(r => r.roomNumber === roomNumber);
+
+            if (selectedRoom) {
+                const rate = selectedRoom.rate || 0;
+                const total = nights * rate;
+                bookingTotalCost.value = total.toFixed(2);
+            } else {
+                bookingTotalCost.value = 0;
+            }
+        }
         
         function populateRoomSelection(rooms) {
             bookingRoomSelect.innerHTML = '<option value="">-- Select Available Room --</option>';
@@ -486,20 +551,24 @@
                 }
                 populateRoomSelection(availableRooms);
                 bookingModal.classList.remove('hidden');
+                // Ensure cost is calculated on opening for new bookings
+                autoCalculateCost(); 
             } else {
                 bookingModal.classList.add('hidden');
             }
         }
         
+        // --- Booking Edit Memory Fix ---
         window.editBooking = function(id, name, roomNumber, checkIn, checkOut, cost) {
             document.getElementById('booking-id').value = id;
             document.getElementById('booking-modal-title').textContent = `Edit Booking for ${name}`;
             document.getElementById('booking-guest-name').value = name;
             document.getElementById('booking-check-in').value = checkIn;
             document.getElementById('booking-check-out').value = checkOut;
-            document.getElementById('booking-total-cost').value = cost;
-            
-            // To ensure the current occupied room is selectable when editing
+            document.getElementById('booking-total-cost').value = cost.toFixed(2); // Set initial cost
+
+            // To ensure the current occupied room is selectable when editing, 
+            // we temporarily combine the current room (if occupied) with the vacant rooms.
             let roomsForEdit = [...availableRooms];
             if (!roomsForEdit.some(r => r.roomNumber === roomNumber)) {
                 const occupiedRoom = currentRooms.find(r => r.roomNumber === roomNumber);
@@ -512,6 +581,8 @@
             
             toggleBookingModal(true, 'edit');
         }
+        // --- End Booking Edit Memory Fix ---
+
 
         function handleBookingSubmit(e) {
             e.preventDefault();
@@ -521,10 +592,11 @@
             const roomNumber = document.getElementById('booking-room-number').value;
             const checkInDate = document.getElementById('booking-check-in').value;
             const checkOutDate = document.getElementById('booking-check-out').value;
-            const totalCost = parseFloat(document.getElementById('booking-total-cost').value);
+            
+            // Recalculate cost upon submission to ensure accuracy
+            const totalCost = parseFloat(bookingTotalCost.value); 
 
             if (checkInDate >= checkOutDate) {
-                 // Use a console error instead of alert/confirm
                  console.error("Validation Error: Check-out date must be after Check-in date.");
                  return;
             }
@@ -573,6 +645,7 @@
                 if (originalRoomNumber && originalRoomNumber !== roomNumber) {
                     const oldRoom = currentRooms.find(r => r.roomNumber === originalRoomNumber);
                     if (oldRoom) {
+                        // Only set old room to vacant if it wasn't re-booked immediately by another user (simplified logic for demo)
                         oldRoom.status = 'Vacant';
                     }
                 }
