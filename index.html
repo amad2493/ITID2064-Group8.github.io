@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hotel Booking System Management (Demonstration)</title>
+    <title>Hotel Booking System Portal - Multi-User Demo</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Use Inter font -->
@@ -11,84 +11,76 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
         body { font-family: 'Inter', sans-serif; }
         /* Custom styles for the color-coded room status */
-        .status-Vacant { background-color: #D1FAE5; color: #065F46; border-left: 4px solid #10B981; } /* Green */
-        .status-Occupied { background-color: #FEE2E2; color: #991B1B; border-left: 4px solid #F87171; } /* Red */
-        .status-Cleaning { background-color: #FEF3C7; color: #92400E; border-left: 4px solid #F59E0B; } /* Yellow */
-        .status-Maintenance { background-color: #E0F2F1; color: #0E7490; border-left: 4px solid #2DD4BF; } /* Cyan */
+        .status-Vacant { background-color: #D1FAE5; color: #065F46; border-left: 4px solid #10B981; } 
+        .status-Occupied { background-color: #FEE2E2; color: #991B1B; border-left: 4px solid #F87171; } 
+        .status-Cleaning { background-color: #FEF3C7; color: #92400E; border-left: 4px solid #F59E0B; } 
+        .status-Maintenance { background-color: #E0F2F1; color: #0E7490; border-left: 4px solid #2DD4BF; } 
         .tab-active { border-bottom: 3px solid #4F46E5; font-weight: 600; color: #4F46E5; }
+        .nav-link { cursor: pointer; }
         
-        /* Removed loading overlay as we don't need authentication */
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06); }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
 
-    <!-- Removed loading screen -->
-
     <div id="app" class="container mx-auto p-4 sm:p-6 lg:p-8">
-        <header class="mb-8 border-b pb-4">
-            <h1 class="text-3xl font-bold text-gray-800">Hotel Booking System - Admin Portal (DEMONSTRATION)</h1>
-            <p class="text-sm text-gray-500 mt-1">Manage room inventory and guest reservations in real-time.</p>
-            <p id="user-info" class="text-xs mt-2 text-gray-500 font-medium">Database: Persistent Browser Storage.</p>
+        <!-- TOP NAVIGATION AND LOGIN/LOGOUT -->
+        <header class="mb-8 border-b pb-4 bg-white p-4 rounded-lg card-shadow">
+            <div class="flex justify-between items-center">
+                <h1 class="text-3xl font-bold text-gray-800 nav-link" onclick="navigate('home')">
+                    UNITAR Hotel Booking System (Frontend POC)
+                </h1>
+                <nav class="space-x-4 flex items-center">
+                    <span id="nav-status" class="text-sm text-gray-600 font-medium">Logged out</span>
+                    <button id="nav-dashboard" onclick="navigate('dashboard')" class="nav-link bg-indigo-500 text-white py-1 px-3 rounded-lg text-sm hover:bg-indigo-600 hidden">Staff Portal</button>
+                    <button id="nav-login" onclick="toggleAuthModal(true)" class="nav-link bg-green-500 text-white py-1 px-3 rounded-lg text-sm hover:bg-green-600">Login/Register</button>
+                    <button id="nav-logout" onclick="logout()" class="nav-link bg-red-500 text-white py-1 px-3 rounded-lg text-sm hover:bg-red-600 hidden">Logout</button>
+                </nav>
+            </div>
+            <p id="user-info" class="text-xs mt-2 text-gray-500 font-medium">Database: Persistent Browser Storage (Demo Mode).</p>
         </header>
+
+        <!-- MAIN VIEW CONTAINER -->
+        <main id="view-container">
+            <!-- Content of Home, Customer, or Staff Dashboard will be rendered here -->
+        </main>
         
-        <!-- TABS FOR NAVIGATION -->
-        <nav class="flex space-x-6 border-b mb-6">
-            <button id="tab-inventory" onclick="switchView('inventory')" class="py-2 px-3 text-sm text-gray-600 hover:text-indigo-600 transition duration-150 tab-active">
-                Room Inventory
-            </button>
-            <button id="tab-bookings" onclick="switchView('bookings')" class="py-2 px-3 text-sm text-gray-600 hover:text-indigo-600 transition duration-150">
-                Current Bookings
-            </button>
-        </nav>
-
-
-        <!-- ROOM INVENTORY VIEW -->
-        <div id="inventory-view" class="view-content">
-            <!-- ADD NEW ROOM FORM/MODAL TRIGGER -->
-            <div class="mb-6 flex justify-between items-center">
-                <button onclick="toggleRoomModal(true)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
-                    + Add New Room
-                </button>
-                <div class="text-sm font-medium text-gray-700">
-                    Total Rooms: <span id="total-rooms" class="text-indigo-600 font-bold">0</span>
+    </div>
+    
+    <!-- AUTH MODAL (Login/Register) -->
+    <div id="auth-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50 hidden" onclick="if(event.target.id === 'auth-modal') toggleAuthModal(false)">
+        <div class="relative top-20 mx-auto p-8 border w-96 shadow-xl rounded-xl bg-white card-shadow">
+            <h3 class="text-2xl font-bold text-gray-900 mb-6">Login / Register</h3>
+            <div id="auth-info" class="text-sm text-gray-600 mb-4 p-3 bg-yellow-50 rounded-lg">
+                This is a DEMO. Login as Customer or Staff. (Staff Email: `staff@hotel.com`, Pass: `admin123`)
+            </div>
+            <form id="auth-form">
+                <div class="mb-4">
+                    <label for="auth-email" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="auth-email" required placeholder="customer@email.com" value="guest@email.com" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
                 </div>
-            </div>
-            
-            <!-- ROOMS GRID -->
-            <div id="rooms-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                <!-- Room cards will be inserted here by JavaScript -->
-            </div>
-
-            <!-- NO ROOMS FOUND MESSAGE -->
-            <div id="no-rooms-message" class="hidden text-center p-10 bg-white rounded-xl shadow-lg mt-8">
-                <p class="text-lg text-gray-500">No rooms found in the inventory. Click "Add New Room" to get started!</p>
-            </div>
-        </div>
-
-        <!-- BOOKINGS VIEW -->
-        <div id="bookings-view" class="view-content hidden">
-            <!-- ADD NEW BOOKING FORM/MODAL TRIGGER -->
-            <div class="mb-6 flex justify-between items-center">
-                <button onclick="toggleBookingModal(true)" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
-                    + Add New Booking
-                </button>
-                <div class="text-sm font-medium text-gray-700">
-                    Active Bookings: <span id="active-bookings" class="text-blue-600 font-bold">0</span>
+                
+                <div class="mb-6">
+                    <label for="auth-password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" id="auth-password" required value="password123" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
                 </div>
-            </div>
-            
-            <!-- BOOKINGS LIST -->
-            <div id="bookings-list" class="flex flex-col space-y-4">
-                <!-- Booking cards/list items will be inserted here by JavaScript -->
-            </div>
-             <!-- NO BOOKINGS FOUND MESSAGE -->
-            <div id="no-bookings-message" class="hidden text-center p-10 bg-white rounded-xl shadow-lg mt-8">
-                <p class="text-lg text-gray-500">No active bookings found. Click "Add New Booking" to create a reservation.</p>
-            </div>
+
+                <div class="flex justify-between items-center space-x-2">
+                    <button type="button" onclick="handleRegister()" class="flex-1 px-4 py-2 bg-indigo-500 text-white font-semibold rounded-lg hover:bg-indigo-600 transition duration-150">
+                        Sign Up (New Customer)
+                    </button>
+                    <button type="submit" class="flex-1 px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition duration-150">
+                        Log In
+                    </button>
+                </div>
+            </form>
+            <button type="button" onclick="toggleAuthModal(false)" class="w-full mt-4 text-center text-sm text-gray-500 hover:text-gray-700">
+                Close
+            </button>
         </div>
     </div>
 
-    <!-- MODAL FOR ADD/EDIT ROOM -->
+    <!-- ROOM MODAL (Shared between Staff and Customer) -->
     <div id="room-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 hidden" onclick="if(event.target.id === 'room-modal') toggleRoomModal(false)">
         <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
             <h3 id="room-modal-title" class="text-xl font-bold text-gray-900 mb-4">Add New Room</h3>
@@ -136,12 +128,13 @@
         </div>
     </div>
     
-    <!-- MODAL FOR ADD/EDIT BOOKING -->
+    <!-- BOOKING MODAL (Shared between Staff and Customer) -->
     <div id="booking-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 hidden" onclick="if(event.target.id === 'booking-modal') toggleBookingModal(false)">
         <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-xl bg-white">
-            <h3 id="booking-modal-title" class="text-xl font-bold text-gray-900 mb-4">Add New Booking</h3>
+            <h3 id="booking-modal-title" class="text-xl font-bold text-gray-900 mb-4">Book a Room</h3>
             <form id="booking-form">
                 <input type="hidden" id="booking-id">
+                <input type="hidden" id="customer-id">
                 
                 <div class="mb-4">
                     <label for="booking-guest-name" class="block text-sm font-medium text-gray-700">Guest Name</label>
@@ -177,8 +170,8 @@
                     <button type="button" onclick="toggleBookingModal(false)" class="px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition duration-150">
                         Cancel
                     </button>
-                    <button type="submit" id="save-booking-button" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150">
-                        Save Booking
+                    <button type="submit" id="save-booking-button" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150">
+                        Confirm Booking
                     </button>
                 </div>
             </form>
@@ -188,20 +181,29 @@
     <!-- JAVASCRIPT LOGIC (USING LOCAL STORAGE) -->
     <script type="text/javascript">
         
-        // --- DATA KEYS ---
+        // --- DATA KEYS & STATE ---
         const ROOMS_KEY = 'hotel_rooms';
         const BOOKINGS_KEY = 'hotel_bookings';
+        const CUSTOMER_KEY = 'hotel_customers';
+        const LOGGED_IN_KEY = 'logged_in_user';
         
         let availableRooms = []; 
-        let currentRooms = []; // Master list of all rooms
+        let currentRooms = []; 
+        let currentCustomers = [];
+        let loggedInUser = null; 
 
-        // UI elements (defined globally for access)
-        const roomsGrid = document.getElementById('rooms-grid');
-        const roomsCount = document.getElementById('total-rooms');
-        const bookingsList = document.getElementById('bookings-list');
-        const bookingsCount = document.getElementById('active-bookings');
-        const noRoomsMessage = document.getElementById('no-rooms-message');
-        const noBookingsMessage = document.getElementById('no-bookings-message');
+        // --- UI elements (defined globally for access) ---
+        const viewContainer = document.getElementById('view-container');
+        const authModal = document.getElementById('auth-modal');
+        const authForm = document.getElementById('auth-form');
+        const authEmailInput = document.getElementById('auth-email');
+        const authPasswordInput = document.getElementById('auth-password');
+        const navStatus = document.getElementById('nav-status');
+        const navLogin = document.getElementById('nav-login');
+        const navLogout = document.getElementById('nav-logout');
+        const navDashboard = document.getElementById('nav-dashboard');
+        
+        // Room/Booking elements (inside modals, accessible globally)
         const roomModal = document.getElementById('room-modal');
         const roomForm = document.getElementById('room-form');
         const bookingModal = document.getElementById('booking-modal');
@@ -210,20 +212,10 @@
         const bookingCheckIn = document.getElementById('booking-check-in');
         const bookingCheckOut = document.getElementById('booking-check-out');
         const bookingTotalCost = document.getElementById('booking-total-cost');
-        const inventoryView = document.getElementById('inventory-view');
-        const bookingsView = document.getElementById('bookings-view');
-        const tabInventory = document.getElementById('tab-inventory');
-        const tabBookings = document.getElementById('tab-bookings');
-
-        let currentView = 'inventory';
+        
 
         // --- Core Utility Functions ---
 
-        /**
-         * Loads data from localStorage or returns an empty array.
-         * @param {string} key - The localStorage key.
-         * @returns {Array} Parsed data array.
-         */
         function loadData(key) {
             try {
                 const data = localStorage.getItem(key);
@@ -234,11 +226,6 @@
             }
         }
 
-        /**
-         * Saves data to localStorage.
-         * @param {string} key - The localStorage key.
-         * @param {Array} data - The array to save.
-         */
         function saveData(key, data) {
             try {
                 localStorage.setItem(key, JSON.stringify(data));
@@ -247,138 +234,398 @@
             }
         }
 
-        /**
-         * Generates a simple unique ID (simulating Firestore/database ID).
-         */
         function generateId() {
             return 'id-' + Date.now() + Math.random().toString(16).slice(2);
         }
 
-        /**
-         * Calculates the difference in days between two YYYY-MM-DD date strings.
-         * @param {string} date1 - Check-in date string.
-         * @param {string} date2 - Check-out date string.
-         * @returns {number} Number of nights (days difference).
-         */
         function calculateNights(date1, date2) {
             if (!date1 || !date2 || date1 >= date2) return 0;
             const d1 = new Date(date1 + 'T00:00:00');
             const d2 = new Date(date2 + 'T00:00:00');
             const diffTime = Math.abs(d2 - d1);
-            // Convert milliseconds to days
             return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         }
-
-        /**
-         * Initializes the application state by loading data and setting up listeners.
-         */
-        function initializeApp() {
-            // Load and render initial state
-            updateAllData();
-
-            // Set up form submission handlers
-            roomForm.addEventListener('submit', handleRoomSubmit);
-            bookingForm.addEventListener('submit', handleBookingSubmit);
-            
-            // Set up event listeners for automatic cost calculation
-            bookingRoomSelect.addEventListener('change', autoCalculateCost);
-            bookingCheckIn.addEventListener('change', autoCalculateCost);
-            bookingCheckOut.addEventListener('change', autoCalculateCost);
-        }
         
-        /**
-         * Refreshes and rerenders all data lists.
-         */
-        function updateAllData() {
-            // 1. Load Rooms
-            currentRooms = loadData(ROOMS_KEY).sort((a, b) => a.roomNumber.localeCompare(b.roomNumber));
-            availableRooms = currentRooms.filter(room => room.status === 'Vacant');
-            renderRooms(currentRooms);
-            
-            // 2. Load Bookings
-            const currentBookings = loadData(BOOKINGS_KEY).sort((a, b) => new Date(a.checkInDate) - new Date(b.checkInDate));
-            renderBookings(currentBookings);
-
-            // 3. Update UI counters
-            roomsCount.textContent = currentRooms.length;
-            bookingsCount.textContent = currentBookings.length;
-            
-            // 4. Update Room Select list in Booking Modal
-            populateRoomSelection(availableRooms);
-        }
-
-        // --- UI & View Management ---
-
-        window.switchView = function(viewName) {
-            currentView = viewName;
-            tabInventory.classList.remove('tab-active');
-            tabBookings.classList.remove('tab-active');
-            inventoryView.classList.add('hidden');
-            bookingsView.classList.add('hidden');
-
-            if (viewName === 'inventory') {
-                tabInventory.classList.add('tab-active');
-                inventoryView.classList.remove('hidden');
-            } else if (viewName === 'bookings') {
-                tabBookings.classList.add('tab-active');
-                bookingsView.classList.remove('hidden');
-            }
-        }
-
         function formatDate(dateString) {
             if (!dateString) return 'N/A';
-            // Use dateString directly as it comes from input[type=date] (YYYY-MM-DD)
             const date = new Date(dateString + 'T00:00:00'); 
             return date.toLocaleDateString('en-MY', { year: 'numeric', month: 'short', day: 'numeric' });
         }
         
-        // --- Room Management Handlers ---
+        // --- Initialization and Global State Update ---
         
-        function renderRooms(rooms) {
-            roomsGrid.innerHTML = '';
+        function updateGlobalState() {
+            // Load all persistent data
+            currentRooms = loadData(ROOMS_KEY).sort((a, b) => a.roomNumber.localeCompare(b.roomNumber));
+            currentCustomers = loadData(CUSTOMER_KEY);
+            availableRooms = currentRooms.filter(room => room.status === 'Vacant');
             
-            rooms.forEach(room => {
-                const card = document.createElement('div');
-                const rateDisplay = typeof room.rate === 'number' ? room.rate.toFixed(2) : parseFloat(room.rate || 0).toFixed(2);
-                
-                card.className = `p-5 rounded-xl shadow-lg transition duration-300 transform hover:scale-[1.02] ${room.status ? 'status-' + room.status : 'bg-gray-100'}`;
-                
-                card.innerHTML = `
-                    <div class="flex justify-between items-center mb-3">
-                        <h2 class="text-2xl font-extrabold">${room.roomNumber}</h2>
-                        <span class="text-xs font-semibold uppercase px-3 py-1 rounded-full border border-indigo-300 bg-indigo-50 text-indigo-700">
-                            ${room.roomType}
-                        </span>
-                    </div>
-                    <div class="mb-4">
-                        <p class="text-gray-600 text-sm">Rate: <span class="font-bold text-lg text-indigo-700">MYR ${rateDisplay}</span></p>
-                        <p class="text-gray-700 font-medium mt-1">Status: ${room.status}</p>
-                    </div>
-                    <div class="flex justify-end space-x-2">
-                        <button onclick="editRoom('${room.id}', '${room.roomNumber}', '${room.roomType}', ${room.rate}, '${room.status}')" 
-                                class="text-indigo-600 hover:text-indigo-800 p-2 rounded-full hover:bg-indigo-100 transition duration-150" title="Edit Room">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                            </svg>
-                        </button>
-                        <button onclick="confirmDeleteRoom('${room.id}', '${room.roomNumber}')" 
-                                class="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-100 transition duration-150" title="Delete Room">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
-                            </svg>
-                        </button>
-                    </div>
-                `;
-                roomsGrid.appendChild(card);
-            });
-            if (rooms.length === 0) {
-                noRoomsMessage.classList.remove('hidden');
+            // Check logged-in status
+            const userString = sessionStorage.getItem(LOGGED_IN_KEY);
+            loggedInUser = userString ? JSON.parse(userString) : null;
+            
+            updateNavigationUI();
+            
+            // Re-render the current view to refresh data
+            if (loggedInUser) {
+                 if (loggedInUser.role === 'staff') {
+                    renderDashboardView();
+                 } else if (loggedInUser.role === 'customer') {
+                    renderCustomerView();
+                 }
             } else {
-                noRoomsMessage.classList.add('hidden');
+                renderHomeView();
             }
         }
         
+        function updateNavigationUI() {
+            navLogin.classList.remove('hidden');
+            navLogout.classList.add('hidden');
+            navDashboard.classList.add('hidden');
+            navStatus.textContent = 'Logged out';
+
+            if (loggedInUser) {
+                navLogin.classList.add('hidden');
+                navLogout.classList.remove('hidden');
+                navStatus.textContent = `Welcome, ${loggedInUser.name}`;
+                
+                if (loggedInUser.role === 'staff') {
+                    navDashboard.classList.remove('hidden');
+                }
+            }
+        }
+
+        window.navigate = function(view) {
+            if (view === 'dashboard' && (!loggedInUser || loggedInUser.role !== 'staff')) {
+                // Prevent non-staff access
+                alert('Access Denied. Only Staff Administrators can access the dashboard.');
+                return;
+            }
+            if (view === 'my-bookings' && !loggedInUser) {
+                alert('Please log in to view your bookings.');
+                toggleAuthModal(true);
+                return;
+            }
+
+            viewContainer.innerHTML = '';
+            
+            switch (view) {
+                case 'home':
+                    renderHomeView();
+                    break;
+                case 'dashboard':
+                    renderDashboardView();
+                    break;
+                case 'my-bookings':
+                    renderCustomerView();
+                    break;
+                default:
+                    renderHomeView();
+            }
+        }
+
+        // --- AUTHENTICATION ---
+        
+        window.toggleAuthModal = function(show) {
+            if (show) {
+                authModal.classList.remove('hidden');
+                authEmailInput.focus();
+            } else {
+                authModal.classList.add('hidden');
+            }
+        }
+        
+        authForm.addEventListener('submit', handleLogin);
+        
+        function handleLogin(e) {
+            e.preventDefault();
+            const email = authEmailInput.value.trim();
+            const password = authPasswordInput.value.trim();
+            
+            // SIMULATED AUTH LOGIC: Staff Login
+            if (email === 'staff@hotel.com' && password === 'admin123') {
+                const staffUser = { id: 'staff-admin', email, name: 'Admin', role: 'staff' };
+                sessionStorage.setItem(LOGGED_IN_KEY, JSON.stringify(staffUser));
+                toggleAuthModal(false);
+                updateGlobalState(); 
+                navigate('dashboard');
+                return;
+            }
+
+            // SIMULATED AUTH LOGIC: Customer Login
+            const user = currentCustomers.find(c => c.email === email && c.password === password);
+            
+            if (user) {
+                sessionStorage.setItem(LOGGED_IN_KEY, JSON.stringify(user));
+                toggleAuthModal(false);
+                updateGlobalState(); 
+                navigate('home');
+            } else {
+                alert('Login failed. Customer account not found or incorrect password. Try signing up.');
+            }
+        }
+
+        window.handleRegister = function() {
+            const email = authEmailInput.value.trim();
+            const password = authPasswordInput.value.trim();
+
+            if (!email || !password) {
+                 alert('Please enter a valid email and password to register.');
+                 return;
+            }
+            
+            if (currentCustomers.some(c => c.email === email) || email === 'staff@hotel.com') {
+                alert('Registration failed: An account with this email already exists.');
+                return;
+            }
+            
+            // SIMULATED REGISTRATION: Create new customer
+            const newUser = { 
+                id: generateId(), 
+                email, 
+                password, // NOTE: Storing password in plain text for demo only. Backend uses hashing!
+                name: email.split('@')[0], 
+                role: 'customer' 
+            };
+            
+            currentCustomers.push(newUser);
+            saveData(CUSTOMER_KEY, currentCustomers);
+            
+            // Log in the new user immediately
+            sessionStorage.setItem(LOGGED_IN_KEY, JSON.stringify(newUser));
+            
+            alert(`Success! Account created for ${newUser.name}. Logging you in now.`);
+            toggleAuthModal(false);
+            updateGlobalState();
+            navigate('home');
+        }
+
+        window.logout = function() {
+            sessionStorage.removeItem(LOGGED_IN_KEY);
+            loggedInUser = null;
+            updateGlobalState();
+            navigate('home');
+        }
+
+
+        // --- VIEW RENDERING FUNCTIONS ---
+        
+        function renderHomeView() {
+            const roomsToShow = currentRooms.filter(r => r.status === 'Vacant');
+            
+            viewContainer.innerHTML = `
+                <div class="p-8 bg-white rounded-xl card-shadow">
+                    <h2 class="text-3xl font-extrabold text-gray-800 mb-2">Search & Book Your Stay</h2>
+                    <p class="text-gray-600 mb-6">View our available rooms below. Log in to reserve your preferred choice! ${loggedInUser && loggedInUser.role === 'customer' ? 'Or, view your reservations by clicking the "My Reservations" link.' : ''}</p>
+                    
+                    ${loggedInUser ? 
+                        `<div class="p-4 mb-6 bg-blue-50 border-l-4 border-blue-500 text-blue-800 rounded-lg">
+                            Welcome back, ${loggedInUser.name}. Click a room and select "Book Now" to confirm a reservation. <span class="nav-link text-blue-700 underline" onclick="navigate('my-bookings')">View My Reservations</span>
+                        </div>` :
+                        `<div class="p-4 mb-6 bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 rounded-lg">
+                            Please log in or register to make a reservation.
+                        </div>`}
+                    
+                    <h3 class="text-xl font-bold text-gray-700 mb-4">Available Rooms (${roomsToShow.length})</h3>
+                    <div id="home-rooms-grid" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        ${roomsToShow.map(room => renderRoomCard(room, true)).join('')}
+                    </div>
+                    ${roomsToShow.length === 0 ? '<p class="text-center text-gray-500 mt-6">Sorry, no rooms are currently available.</p>' : ''}
+                </div>
+            `;
+        }
+
+        function renderRoomCard(room, forCustomer = false) {
+            const rateDisplay = room.rate ? room.rate.toFixed(2) : 'N/A';
+            const statusClass = room.status ? 'status-' + room.status : 'bg-gray-100';
+
+            return `
+                <div class="p-5 rounded-xl card-shadow transition duration-300 hover:shadow-lg ${statusClass}">
+                    <h2 class="text-2xl font-extrabold mb-1">${room.roomNumber}</h2>
+                    <p class="text-sm font-semibold uppercase text-indigo-700">${room.roomType}</p>
+                    <p class="text-xl font-bold mt-3">MYR ${rateDisplay}</p>
+                    <p class="text-xs text-gray-700 mb-4">Status: ${room.status}</p>
+                    
+                    ${forCustomer && room.status === 'Vacant' && loggedInUser ? 
+                        `<button onclick="startCustomerBooking('${room.roomNumber}')" class="w-full bg-green-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-green-700 mt-2">
+                            Book Now
+                        </button>` : 
+                        (forCustomer && room.status === 'Vacant' ? 
+                           `<button onclick="toggleAuthModal(true)" class="w-full bg-green-500 text-white py-2 rounded-lg text-sm font-semibold hover:bg-green-600 mt-2">
+                                Login to Book
+                            </button>` :
+                        (forCustomer ? `<button class="w-full bg-gray-400 text-white py-2 rounded-lg text-sm font-semibold mt-2 cursor-not-allowed" disabled>
+                            ${room.status === 'Occupied' ? 'Booked' : 'Unavailable'}
+                        </button>` : 
+                        // Staff view buttons
+                        `<div class="flex justify-end space-x-2">
+                            <button onclick="editRoom('${room.id}', '${room.roomNumber}', '${room.roomType}', ${room.rate}, '${room.status}')" 
+                                    class="text-indigo-600 hover:text-indigo-800 p-2 rounded-full hover:bg-indigo-100 transition duration-150" title="Edit Room">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                </svg>
+                            </button>
+                            <button onclick="confirmDeleteRoom('${room.id}', '${room.roomNumber}')" 
+                                    class="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-100 transition duration-150" title="Delete Room">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>`)
+                    }
+                </div>
+            `;
+        }
+
+        window.startCustomerBooking = function(roomNumber) {
+            document.getElementById('customer-id').value = loggedInUser.id;
+            document.getElementById('booking-guest-name').value = loggedInUser.name;
+            
+            // Pre-select the room in the modal
+            let roomsForBooking = availableRooms.filter(r => r.roomNumber === roomNumber);
+            populateRoomSelection(roomsForBooking);
+            bookingRoomSelect.value = roomNumber;
+            
+            toggleBookingModal(true);
+        }
+
+        function renderCustomerView() {
+            const userBookings = loadData(BOOKINGS_KEY).filter(b => b.customerId === loggedInUser.id)
+                .sort((a, b) => new Date(a.checkInDate) - new Date(b.checkInDate));
+            
+            viewContainer.innerHTML = `
+                <div class="p-8 bg-white rounded-xl card-shadow">
+                    <h2 class="text-3xl font-extrabold text-gray-800 mb-2">My Reservations</h2>
+                    <p class="text-gray-600 mb-6">Manage your upcoming and past bookings. <span class="nav-link text-blue-700 underline" onclick="navigate('home')">Book a new room.</span></p>
+                    
+                    <h3 class="text-xl font-bold text-gray-700 mb-4">Active Bookings (${userBookings.length})</h3>
+                    <div id="my-bookings-list" class="flex flex-col space-y-4">
+                        ${userBookings.map(booking => renderBookingItem(booking, true)).join('')}
+                    </div>
+                    ${userBookings.length === 0 ? '<p class="text-center text-gray-500 mt-6">You have no active bookings. Go to the Home view to search for rooms.</p>' : ''}
+                </div>
+            `;
+        }
+        
+        // --- STAFF DASHBOARD VIEW RENDERING (incorporates old logic) ---
+        
+        function renderDashboardView() {
+            const currentBookings = loadData(BOOKINGS_KEY).sort((a, b) => new Date(a.checkInDate) - new Date(b.checkInDate));
+            
+            viewContainer.innerHTML = `
+                <div class="p-8 bg-white rounded-xl card-shadow">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-6">Staff Administration Dashboard</h2>
+                    
+                    <nav class="flex space-x-6 border-b mb-6">
+                        <button id="dash-tab-inventory" onclick="switchDashboardTab('inventory')" class="py-2 px-3 text-sm text-gray-600 hover:text-indigo-600 transition duration-150 tab-active">
+                            Room Inventory
+                        </button>
+                        <button id="dash-tab-bookings" onclick="switchDashboardTab('bookings')" class="py-2 px-3 text-sm text-gray-600 hover:text-indigo-600 transition duration-150">
+                            Current Reservations
+                        </button>
+                    </nav>
+
+                    <!-- INVENTORY CONTENT -->
+                    <div id="dash-inventory-content" class="dash-view-content">
+                        <div class="mb-6 flex justify-between items-center">
+                            <button onclick="toggleRoomModal(true)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
+                                + Add New Room
+                            </button>
+                            <div class="text-sm font-medium text-gray-700">
+                                Total Rooms: <span id="total-rooms" class="text-indigo-600 font-bold">${currentRooms.length}</span>
+                            </div>
+                        </div>
+                        <div id="rooms-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                            ${currentRooms.map(room => renderRoomCard(room, false)).join('')}
+                        </div>
+                        ${currentRooms.length === 0 ? '<p id="no-rooms-message" class="text-center text-gray-500 mt-6">No rooms found in the inventory.</p>' : ''}
+                    </div>
+
+                    <!-- BOOKINGS CONTENT -->
+                    <div id="dash-bookings-content" class="dash-view-content hidden">
+                        <div class="mb-6 flex justify-between items-center">
+                            <button onclick="toggleBookingModal(true)" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out">
+                                + Add New Booking
+                            </button>
+                            <div class="text-sm font-medium text-gray-700">
+                                Active Bookings: <span id="active-bookings" class="text-blue-600 font-bold">${currentBookings.length}</span>
+                            </div>
+                        </div>
+                        <div id="bookings-list" class="flex flex-col space-y-4">
+                            ${currentBookings.map(booking => renderBookingItem(booking, false)).join('')}
+                        </div>
+                        ${currentBookings.length === 0 ? '<p id="no-bookings-message" class="text-center text-gray-500 mt-6">No active bookings found.</p>' : ''}
+                    </div>
+                </div>
+            `;
+            
+            // Re-map elements specific to the dashboard view after rendering
+            window.roomsGrid = document.getElementById('rooms-grid');
+            window.roomsCount = document.getElementById('total-rooms');
+            window.bookingsList = document.getElementById('bookings-list');
+            window.bookingsCount = document.getElementById('active-bookings');
+
+            // Apply the active tab style
+            const activeTab = sessionStorage.getItem('dashboard-tab') || 'inventory';
+            switchDashboardTab(activeTab);
+        }
+        
+        window.switchDashboardTab = function(tabName) {
+            sessionStorage.setItem('dashboard-tab', tabName);
+            document.querySelectorAll('.dash-view-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('[id^="dash-tab-"]').forEach(el => el.classList.remove('tab-active'));
+            
+            document.getElementById(`dash-${tabName}-content`).classList.remove('hidden');
+            document.getElementById(`dash-tab-${tabName}`).classList.add('tab-active');
+        }
+
+        function renderBookingItem(booking, forCustomer) {
+            const costDisplay = booking.totalCost ? booking.totalCost.toFixed(2) : 'N/A';
+            
+            return `
+                <div class="p-4 bg-white rounded-lg card-shadow border-l-4 border-blue-500 flex justify-between items-center">
+                    <div>
+                        <p class="text-lg font-bold text-gray-800">${booking.guestName}</p>
+                        <p class="text-sm text-gray-600">Room: <span class="font-semibold">${booking.roomNumber}</span></p>
+                        <p class="text-sm text-gray-500">
+                            Check-in: ${formatDate(booking.checkInDate)} &rarr; Check-out: ${formatDate(booking.checkOutDate)}
+                        </p>
+                        ${forCustomer ? '' : `<p class="text-xs text-gray-400">Customer ID: ${booking.customerId}</p>`}
+                    </div>
+                    <div class="text-right flex items-center space-x-3">
+                        <p class="text-xl font-extrabold text-blue-700">MYR ${costDisplay}</p>
+                        
+                        ${!forCustomer || (forCustomer && new Date(booking.checkInDate) > new Date()) ? 
+                            `<button onclick="editBooking('${booking.id}', '${booking.guestName}', '${booking.roomNumber}', '${booking.checkInDate}', '${booking.checkOutDate}', ${booking.totalCost})" 
+                                    class="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-100 transition duration-150" title="Edit Booking">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+                            </button>
+                            <button onclick="confirmDeleteBooking('${booking.id}', '${booking.roomNumber}', '${booking.guestName}')" 
+                                    class="text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-100 transition duration-150" title="Cancel Booking">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" /></svg>
+                            </button>` : `<span class="text-xs text-gray-500">Past Booking</span>`
+                        }
+                    </div>
+                </div>
+            `;
+        }
+
+
+        // --- CRUD LOGIC FUNCTIONS ---
+
+        // Replaced old updateAllData with the new state-driven flow
+        window.updateAllData = function() {
+             currentRooms = loadData(ROOMS_KEY).sort((a, b) => a.roomNumber.localeCompare(b.roomNumber));
+             availableRooms = currentRooms.filter(room => room.status === 'Vacant');
+             
+             // Re-render the current logical view
+             updateGlobalState();
+        }
+
+        // --- Room Management Handlers ---
+        
         window.toggleRoomModal = function(show, mode = 'add') {
+            // ... (No change needed here from previous logic) ...
             const title = document.getElementById('room-modal-title');
             roomForm.reset();
             document.getElementById('room-id').value = '';
@@ -393,22 +640,20 @@
             }
         }
         
-        // --- Room Edit Memory Fix ---
         window.editRoom = function(id, number, type, rate, status) {
             document.getElementById('room-id').value = id;
             document.getElementById('room-modal-title').textContent = `Edit Room ${number}`;
             document.getElementById('room-number').value = number;
             document.getElementById('room-type').value = type;
             document.getElementById('room-rate').value = rate;
-            // Set the correct status value in the dropdown
             document.getElementById('room-status').value = status; 
+            
             toggleRoomModal(true, 'edit');
         }
-        // --- End Room Edit Memory Fix ---
 
         function handleRoomSubmit(e) {
             e.preventDefault();
-
+            // ... (No change needed here from previous logic) ...
             const id = document.getElementById('room-id').value;
             const number = document.getElementById('room-number').value.trim();
             const type = document.getElementById('room-type').value;
@@ -416,22 +661,19 @@
             const status = document.getElementById('room-status').value;
             
             let rooms = loadData(ROOMS_KEY);
-            // Check for duplicate room number only on *new* entry
             if (!id && rooms.some(r => r.roomNumber.toLowerCase() === number.toLowerCase())) {
-                 console.error(`Validation Error: Room number ${number} already exists.`);
+                 alert(`Validation Error: Room number ${number} already exists.`);
                  return;
             }
             
             const roomData = { id: id || generateId(), roomNumber: number, roomType: type, rate: rate, status: status, updatedAt: new Date().toISOString() };
 
             if (id) {
-                // Update existing room
                 const index = rooms.findIndex(r => r.id === id);
                 if (index !== -1) {
                     rooms[index] = roomData;
                 }
             } else {
-                // Add new room
                 rooms.push(roomData);
             }
             
@@ -441,25 +683,19 @@
         }
         
         window.confirmDeleteRoom = function(roomId, roomNumber) {
-            // Check if any booking uses this room before deleting
             const bookings = loadData(BOOKINGS_KEY);
             if (bookings.some(b => b.roomNumber === roomNumber)) {
-                console.error(`Error: Cannot delete Room ${roomNumber}. It is currently associated with an active booking.`);
+                alert(`Error: Cannot delete Room ${roomNumber}. It is currently associated with an active booking.`);
                 return;
             }
 
             const confirmation = window.confirm(`Are you sure you want to delete Room ${roomNumber}? This cannot be undone.`);
             if (confirmation) {
-                deleteRoom(roomId, roomNumber);
+                let rooms = loadData(ROOMS_KEY);
+                rooms = rooms.filter(r => r.id !== roomId);
+                saveData(ROOMS_KEY, rooms);
+                updateAllData();
             }
-        }
-
-        function deleteRoom(id, number) {
-            let rooms = loadData(ROOMS_KEY);
-            rooms = rooms.filter(r => r.id !== id);
-            saveData(ROOMS_KEY, rooms);
-            updateAllData();
-            console.log(`Room ${number} deleted successfully.`);
         }
 
 
@@ -476,8 +712,6 @@
             }
 
             const nights = calculateNights(checkIn, checkOut);
-            
-            // Find the room rate based on the selected room number (it might be in availableRooms or currentRooms)
             const selectedRoom = currentRooms.find(r => r.roomNumber === roomNumber);
 
             if (selectedRoom) {
@@ -490,7 +724,7 @@
         }
         
         function populateRoomSelection(rooms) {
-            bookingRoomSelect.innerHTML = '<option value="">-- Select Available Room --</option>';
+            bookingRoomSelect.innerHTML = '<option value="">-- Select Room --</option>';
             rooms.forEach(room => {
                 const option = document.createElement('option');
                 option.value = room.roomNumber;
@@ -498,77 +732,36 @@
                 bookingRoomSelect.appendChild(option);
             });
         }
-
-        function renderBookings(bookings) {
-            bookingsList.innerHTML = '';
-            
-            if (bookings.length === 0) {
-                noBookingsMessage.classList.remove('hidden');
-                return;
-            }
-            noBookingsMessage.classList.add('hidden');
-
-            bookings.forEach(booking => {
-                const item = document.createElement('div');
-                item.className = 'p-4 bg-white rounded-lg shadow-md border-l-4 border-blue-500 flex justify-between items-center';
-                
-                const costDisplay = typeof booking.totalCost === 'number' ? booking.totalCost.toFixed(2) : parseFloat(booking.totalCost || 0).toFixed(2);
-                
-                item.innerHTML = `
-                    <div>
-                        <p class="text-lg font-bold text-gray-800">${booking.guestName}</p>
-                        <p class="text-sm text-gray-600">Room: <span class="font-semibold">${booking.roomNumber}</span></p>
-                        <p class="text-sm text-gray-500">
-                            Check-in: ${formatDate(booking.checkInDate)} $\rightarrow$ Check-out: ${formatDate(booking.checkOutDate)}
-                        </p>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-xl font-extrabold text-blue-700">MYR ${costDisplay}</p>
-                        <div class="flex space-x-2 mt-2">
-                            <button onclick="editBooking('${booking.id}', '${booking.guestName}', '${booking.roomNumber}', '${booking.checkInDate}', '${booking.checkOutDate}', ${booking.totalCost})" 
-                                    class="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-100 transition duration-150" title="Edit Booking">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
-                            </button>
-                            <button onclick="confirmDeleteBooking('${booking.id}', '${booking.roomNumber}', '${booking.guestName}')" 
-                                    class="text-red-600 hover:text-red-800 p-1 rounded-full hover:bg-red-100 transition duration-150" title="Cancel Booking">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 10-2 0v6a1 1 0 102 0V8z" clip-rule="evenodd" /></svg>
-                            </button>
-                        </div>
-                    </div>
-                `;
-                bookingsList.appendChild(item);
-            });
-        }
         
         window.toggleBookingModal = function(show, mode = 'add') {
             const title = document.getElementById('booking-modal-title');
             bookingForm.reset();
             document.getElementById('booking-id').value = '';
+            document.getElementById('customer-id').value = loggedInUser ? loggedInUser.id : '';
+            document.getElementById('booking-guest-name').value = loggedInUser ? loggedInUser.name : '';
             
             if (show) {
                 if (mode === 'add') {
                     title.textContent = 'Add New Booking';
+                    // For staff, populate all vacant rooms. For customers, only populate rooms that match home view criteria.
+                    populateRoomSelection(loggedInUser && loggedInUser.role === 'staff' ? availableRooms : availableRooms);
                 }
-                populateRoomSelection(availableRooms);
                 bookingModal.classList.remove('hidden');
-                // Ensure cost is calculated on opening for new bookings
                 autoCalculateCost(); 
             } else {
                 bookingModal.classList.add('hidden');
             }
         }
         
-        // --- Booking Edit Memory Fix ---
         window.editBooking = function(id, name, roomNumber, checkIn, checkOut, cost) {
+            // ... (Booking Edit Memory Fix - no major change needed here) ...
             document.getElementById('booking-id').value = id;
             document.getElementById('booking-modal-title').textContent = `Edit Booking for ${name}`;
             document.getElementById('booking-guest-name').value = name;
             document.getElementById('booking-check-in').value = checkIn;
             document.getElementById('booking-check-out').value = checkOut;
-            document.getElementById('booking-total-cost').value = cost.toFixed(2); // Set initial cost
+            document.getElementById('booking-total-cost').value = cost.toFixed(2); 
 
-            // To ensure the current occupied room is selectable when editing, 
-            // we temporarily combine the current room (if occupied) with the vacant rooms.
             let roomsForEdit = [...availableRooms];
             if (!roomsForEdit.some(r => r.roomNumber === roomNumber)) {
                 const occupiedRoom = currentRooms.find(r => r.roomNumber === roomNumber);
@@ -581,7 +774,6 @@
             
             toggleBookingModal(true, 'edit');
         }
-        // --- End Booking Edit Memory Fix ---
 
 
         function handleBookingSubmit(e) {
@@ -592,22 +784,23 @@
             const roomNumber = document.getElementById('booking-room-number').value;
             const checkInDate = document.getElementById('booking-check-in').value;
             const checkOutDate = document.getElementById('booking-check-out').value;
+            const customerId = document.getElementById('customer-id').value || (loggedInUser ? loggedInUser.id : 'anon');
             
-            // Recalculate cost upon submission to ensure accuracy
             const totalCost = parseFloat(bookingTotalCost.value); 
 
             if (checkInDate >= checkOutDate) {
-                 console.error("Validation Error: Check-out date must be after Check-in date.");
+                 alert("Validation Error: Check-out date must be after Check-in date.");
                  return;
             }
             if (!roomNumber) {
-                 console.error("Validation Error: Please select a room.");
+                 alert("Validation Error: Please select a room.");
                  return;
             }
 
             let bookings = loadData(BOOKINGS_KEY);
             const bookingData = {
                 id: id || generateId(),
+                customerId,
                 guestName,
                 roomNumber,
                 checkInDate,
@@ -635,24 +828,20 @@
 
             // CRITICAL LOGIC: Update room status
             if (!id || originalRoomNumber !== roomNumber) {
-                // 1. Mark new room as Occupied (only if adding new or changing rooms)
                 const newRoom = currentRooms.find(r => r.roomNumber === roomNumber);
                 if (newRoom) {
                     newRoom.status = 'Occupied';
                 }
                 
-                // 2. Mark old room as Vacant (only if changing rooms)
                 if (originalRoomNumber && originalRoomNumber !== roomNumber) {
                     const oldRoom = currentRooms.find(r => r.roomNumber === originalRoomNumber);
                     if (oldRoom) {
-                        // Only set old room to vacant if it wasn't re-booked immediately by another user (simplified logic for demo)
                         oldRoom.status = 'Vacant';
                     }
                 }
                 
                 saveData(ROOMS_KEY, currentRooms);
             }
-
 
             updateAllData();
             toggleBookingModal(false);
@@ -662,30 +851,24 @@
         window.confirmDeleteBooking = function(bookingId, roomNumber, guestName) {
             const confirmation = window.confirm(`Are you sure you want to cancel the booking for ${guestName} (Room ${roomNumber})? This will set the room status back to Vacant.`);
             if (confirmation) {
-                deleteBooking(bookingId, roomNumber, guestName);
+                let bookings = loadData(BOOKINGS_KEY);
+                bookings = bookings.filter(b => b.id !== bookingId);
+                saveData(BOOKINGS_KEY, bookings);
+
+                const roomToFree = currentRooms.find(r => r.roomNumber === roomNumber);
+                if (roomToFree) {
+                    roomToFree.status = 'Vacant';
+                    saveData(ROOMS_KEY, currentRooms);
+                }
+
+                updateAllData();
+                console.log(`Booking for ${name} cancelled successfully. Room ${roomNumber} set to Vacant.`);
             }
-        }
-
-        function deleteBooking(id, roomNumber, name) {
-            // 1. Remove booking record
-            let bookings = loadData(BOOKINGS_KEY);
-            bookings = bookings.filter(b => b.id !== id);
-            saveData(BOOKINGS_KEY, bookings);
-
-            // 2. Free up the room (set status to Vacant)
-            const roomToFree = currentRooms.find(r => r.roomNumber === roomNumber);
-            if (roomToFree) {
-                roomToFree.status = 'Vacant';
-                saveData(ROOMS_KEY, currentRooms);
-            }
-
-            updateAllData();
-            console.log(`Booking for ${name} cancelled successfully. Room ${roomNumber} set to Vacant.`);
         }
 
         // --- Start Application ---
-        document.addEventListener('DOMContentLoaded', initializeApp);
-        window.onload = () => switchView('inventory');
+        document.addEventListener('DOMContentLoaded', updateGlobalState);
+        window.onload = () => navigate('home');
     </script>
 </body>
 </html>
